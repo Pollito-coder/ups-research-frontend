@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPC Research</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; height: 100vh; overflow: hidden; color: #111; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#header { background: #1a3a50; padding: 0 24px; display: flex; align-items: center; height: 68px; flex-shrink: 0; position: relative; }
+#header-logo { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; color: #fff; white-space: nowrap; display: flex; align-items: center; gap: 11px; }
+#header-logo svg { width: 60px; height: 60px; flex-shrink: 0; border-radius: 50%; }
+#header-tabs { position: absolute; left: 50%; transform: translateX(-50%); display: flex; }
+.tab { padding: 0 22px; height: 68px; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.5); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.tab.active { color: #fff; border-bottom-color: #fff; }
+.tab:hover { color: rgba(255,255,255,0.85); }
+
+#body { flex: 1; display: flex; overflow: hidden; }
+
+#sidebar { width: 260px; min-width: 260px; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; background: #f8f9fb; overflow: hidden; }
+#sidebar-top { padding: 12px 12px 8px; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 8px; }
+#new-chat-btn { width: 100%; padding: 9px 14px; background: #1a3a50; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s; }
+#new-chat-btn:hover { background: #2a5470; }
+#project-row { display: flex; gap: 6px; align-items: center; }
+#project-select { flex: 1; border: 1px solid #e5e7eb; border-radius: 7px; padding: 7px 10px; font-size: 12px; background: #fff; color: #111; outline: none; cursor: pointer; }
+#project-select:focus { border-color: #1a3a50; }
+#add-proj-btn { width: 30px; height: 30px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; color: #6b7280; flex-shrink: 0; transition: all 0.15s; }
+#add-proj-btn:hover { border-color: #1a3a50; color: #1a3a50; }
+#chat-list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 1px; }
+#chat-list::-webkit-scrollbar { width: 3px; }
+#chat-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+.chat-item { padding: 9px 10px; border-radius: 7px; cursor: pointer; transition: background 0.1s; }
+.chat-item:hover { background: #eef0f5; }
+.chat-item.active { background: #e2e5ed; }
+.chat-item-title { font-size: 12px; font-weight: 500; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.chat-item-meta { display: flex; align-items: center; gap: 5px; }
+.chat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.chat-date { font-size: 10px; color: #9ca3af; }
+
+#proj-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
+#proj-modal.open { display: flex; }
+#proj-modal-box { background: #fff; border-radius: 12px; padding: 22px; width: 300px; box-shadow: 0 8px 30px rgba(0,0,0,0.18); }
+#proj-modal-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+#proj-name-inp { width: 100%; border: 1px solid #e5e7eb; border-radius: 7px; padding: 8px 11px; font-size: 13px; outline: none; margin-bottom: 10px; }
+#proj-name-inp:focus { border-color: #1a3a50; }
+.color-row { display: flex; gap: 7px; margin-bottom: 14px; }
+.col-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.col-dot.sel { border-color: #1a3a50; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.mbtn { padding: 7px 14px; border-radius: 7px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #e5e7eb; background: #fff; }
+.mbtn.primary { background: #1a3a50; color: #fff; border-color: #1a3a50; }
+.mbtn:hover { background: #f0f0f0; }
+.mbtn.primary:hover { background: #2a5470; }
+
+#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+#chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+#messages { flex: 1; overflow-y: auto; padding: 24px 10%; display: flex; flex-direction: column; gap: 16px; }
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+.msg { display: flex; gap: 10px; }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar { width: 28px; height: 28px; min-width: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+.msg.assistant .msg-avatar { background: #1a3a50; border: none; padding: 0; overflow: hidden; }
+.msg.assistant .msg-avatar svg { width: 28px; height: 28px; }
+
+.msg.user .msg-avatar { background: #e5e7eb; color: #374151; font-size: 10px; font-weight: 700; }
+.msg-bubble { padding: 13px 17px; border-radius: 14px; font-size: 14px; line-height: 1.7; }
+.msg.assistant .msg-bubble { background: #fff; color: #111; border: 1px solid #e5e7eb; border-top-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 820px; }
+.msg.user .msg-bubble { background: #1a3a50; color: #fff; border-top-right-radius: 4px; max-width: 600px; }
+.decision-link { color: #2563eb; font-weight: 600; text-decoration: underline; }
+.law-link { color: #2563eb; font-weight: 600; text-decoration: underline; }
+.law-link:hover { color: #047857; }
+.decision-link:hover { color: #1d4ed8; }
+#input-area { padding: 14px 10%; background: #fff; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; align-items: flex-end; }
+#chat-input { flex: 1; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; font-size: 14px; resize: none; outline: none; font-family: inherit; line-height: 1.5; min-height: 48px; max-height: 140px; transition: border 0.15s; }
+#chat-input:focus { border-color: #1a3a50; }
+#send-btn { width: 42px; height: 42px; background: #1a3a50; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; transition: background 0.15s; }
+#send-btn:hover { background: #2a5470; }
+
+.suggestions-row { display: flex; gap: 8px; padding: 0 10% 12px; flex-wrap: wrap; background: #fff; }
+.suggestion-btn { background: #f0f5ff; border: 1px solid #c7d9f5; border-radius: 20px; padding: 7px 14px; font-size: 12px; color: #1a3a50; cursor: pointer; transition: all 0.15s; }
+.suggestion-btn:hover { border-color: #1a3a50; background: #dceeff; }
+
+#db-panel { flex: 1; display: none; flex-direction: column; overflow: hidden; background: #fff; }
+#db-toolbar { padding: 14px 24px; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; }
+#db-search { flex: 1; max-width: 480px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 14px 9px 36px; font-size: 14px; outline: none; background: #f5f5f5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center; }
+#db-search:focus { border-color: #1a1f2e; background-color: #fff; }
+#db-count { color: #6b7280; font-size: 13px; white-space: nowrap; margin-left: auto; }
+#db-table-wrap { flex: 1; overflow-y: auto; }
+#db-table-wrap::-webkit-scrollbar { width: 6px; }
+#db-table-wrap::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { position: sticky; top: 0; z-index: 1; }
+th { padding: 10px 16px; text-align: left; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #e5e7eb; cursor: pointer; user-select: none; white-space: nowrap; background: #f0f2f5; }
+th:hover { color: #1a3a50; }
+th.sorted { color: #1a3a50; }
+th .sort-icon { margin-left: 3px; font-size: 10px; }
+td { padding: 11px 16px; border-bottom: 1px solid #f3f4f6; color: #374151; vertical-align: middle; background: #fff; }
+tr:hover td { background: #f5f7ff; }
+tr:last-child td { border-bottom: none; }
+.col-date { white-space: nowrap; width: 110px; font-variant-numeric: tabular-nums; }
+.col-court { color: #6b7280; width: 160px; }
+.col-type { width: 140px; }
+.pdf-link { display: inline-flex; align-items: center; gap: 6px; color: #2563eb; font-weight: 600; font-size: 13px; text-decoration: none; }
+.pdf-link:hover { text-decoration: underline; color: #1d4ed8; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }
+.badge-decision { background: rgba(37,99,235,0.1); color: #2563eb; }
+.badge-order { background: rgba(217,119,6,0.1); color: #d97706; }
+
+#legal-panel { display: none; flex: 1; overflow-y: auto; padding: 32px; background: #fff; }
+#legal-panel h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: #111; }
+.legal-cards { display: flex; gap: 14px; flex-wrap: wrap; }
+.legal-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; width: 190px; transition: box-shadow 0.2s; text-decoration: none; display: block; }
+.legal-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); border-color: #ccc; }
+.legal-card-icon { font-size: 1.5rem; margin-bottom: 10px; }
+.legal-card-title { font-weight: 700; margin-bottom: 4px; color: #111; font-size: 14px; }
+.legal-card-desc { font-size: 11px; color: #6b7280; line-height: 1.5; }
+
+@keyframes logoPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.92); }
+}
+.typing-avatar svg { animation: logoPulse 1.4s ease-in-out infinite; }
+.typing-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #999; animation: blink 1.3s infinite; margin: 0 2px; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100%{opacity:0.15} 40%{opacity:0.8} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="header-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a8d4e8"/>
+      <stop offset="40%" stop-color="#4a7fa0"/>
+      <stop offset="100%" stop-color="#1a3a50"/>
+    </radialGradient>
+    <filter id="dotGlow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="lineGlow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="200" cy="200" r="195" fill="url(#bgGrad)"/>
+  <g stroke="white" stroke-width="2.2" opacity="0.75" filter="url(#lineGlow)">
+    <line x1="200" y1="60" x2="200" y2="340"/>
+    <line x1="270" y1="78.8" x2="130" y2="321.2"/>
+    <line x1="321.2" y1="130" x2="78.8" y2="270"/>
+    <line x1="340" y1="200" x2="60" y2="200"/>
+    <line x1="321.2" y1="270" x2="78.8" y2="130"/>
+    <line x1="270" y1="321.2" x2="130" y2="78.8"/>
+  </g>
+  <g stroke="white" stroke-width="1.8" opacity="0.45">
+    <line x1="200" y1="60" x2="321.2" y2="270"/><line x1="270" y1="78.8" x2="270" y2="321.2"/>
+    <line x1="321.2" y1="130" x2="200" y2="340"/><line x1="340" y1="200" x2="130" y2="321.2"/>
+    <line x1="321.2" y1="270" x2="78.8" y2="270"/><line x1="270" y1="321.2" x2="60" y2="200"/>
+    <line x1="200" y1="340" x2="78.8" y2="130"/><line x1="130" y1="321.2" x2="130" y2="78.8"/>
+    <line x1="78.8" y1="270" x2="200" y2="60"/><line x1="60" y1="200" x2="270" y2="78.8"/>
+    <line x1="78.8" y1="130" x2="321.2" y2="130"/><line x1="130" y1="78.8" x2="340" y2="200"/>
+  </g>
+  <g stroke="white" stroke-width="1.2" opacity="0.32">
+    <line x1="200" y1="60" x2="321.2" y2="130"/><line x1="270" y1="78.8" x2="340" y2="200"/>
+    <line x1="321.2" y1="130" x2="321.2" y2="270"/><line x1="340" y1="200" x2="270" y2="321.2"/>
+    <line x1="321.2" y1="270" x2="200" y2="340"/><line x1="270" y1="321.2" x2="130" y2="321.2"/>
+    <line x1="200" y1="340" x2="78.8" y2="270"/><line x1="130" y1="321.2" x2="60" y2="200"/>
+    <line x1="78.8" y1="270" x2="78.8" y2="130"/><line x1="60" y1="200" x2="130" y2="78.8"/>
+    <line x1="78.8" y1="130" x2="200" y2="60"/><line x1="130" y1="78.8" x2="270" y2="78.8"/>
+  </g>
+  <g stroke="white" stroke-width="0.9" opacity="0.4">
+    <line x1="200" y1="60" x2="270" y2="78.8"/><line x1="270" y1="78.8" x2="321.2" y2="130"/>
+    <line x1="321.2" y1="130" x2="340" y2="200"/><line x1="340" y1="200" x2="321.2" y2="270"/>
+    <line x1="321.2" y1="270" x2="270" y2="321.2"/><line x1="270" y1="321.2" x2="200" y2="340"/>
+    <line x1="200" y1="340" x2="130" y2="321.2"/><line x1="130" y1="321.2" x2="78.8" y2="270"/>
+    <line x1="78.8" y1="270" x2="60" y2="200"/><line x1="60" y1="200" x2="78.8" y2="130"/>
+    <line x1="78.8" y1="130" x2="130" y2="78.8"/><line x1="130" y1="78.8" x2="200" y2="60"/>
+  </g>
+  <g fill="white" filter="url(#dotGlow)">
+    <circle cx="200" cy="60" r="11"/><circle cx="270" cy="78.8" r="11"/>
+    <circle cx="321.2" cy="130" r="11"/><circle cx="340" cy="200" r="11"/>
+    <circle cx="321.2" cy="270" r="11"/><circle cx="270" cy="321.2" r="11"/>
+    <circle cx="200" cy="340" r="11"/><circle cx="130" cy="321.2" r="11"/>
+    <circle cx="78.8" cy="270" r="11"/><circle cx="60" cy="200" r="11"/>
+    <circle cx="78.8" cy="130" r="11"/><circle cx="130" cy="78.8" r="11"/>
+  </g>
+</svg>
+      UPC Research
+    </div>
+    <div id="header-tabs">
+      <div class="tab active" onclick="switchTab('chat')">KI-Recherche</div>
+      <div class="tab" onclick="switchTab('db')">Datenbank</div>
+      <div class="tab" onclick="switchTab('legal')">Gesetze</div>
+    </div>
+  </div>
+
+  <div id="body">
+    <div id="sidebar">
+      <div id="sidebar-top">
+        <button id="new-chat-btn" onclick="newChat()">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Neuer Chat
+        </button>
+        <div id="project-row">
+          <select id="project-select" onchange="filterByProject(this.value)">
+            <option value="">Alle Chats</option>
+          </select>
+          <button id="add-proj-btn" onclick="openProjModal()" title="Neues Projekt">+</button>
+        </div>
+      </div>
+      <div id="chat-list"></div>
+    </div>
+
+    <div id="main">
+      <div id="chat-panel">
+        <div id="messages"></div>
+        <div id="input-area">
+          <textarea id="chat-input" placeholder="Frage zu UPC-Entscheidungen stellen…" onkeydown="handleKey(event)"></textarea>
+          <button id="send-btn" onclick="sendMessage()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 8L14 8M14 8L9 3M14 8L9 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="db-panel">
+        <div id="db-toolbar">
+          <input type="text" id="db-search" placeholder="Suche nach Stichwort, Partei, Referenz, Datum…" oninput="filterTable(this.value)">
+          <span id="db-count">Lade…</span>
+        </div>
+        <div id="db-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortTable('date')">Datum <span class="sort-icon">↕</span></th>
+                <th onclick="sortTable('court')">Gericht <span class="sort-icon">↕</span></th>
+                <th>Parteien</th>
+                <th onclick="sortTable('type')">Dokument <span class="sort-icon">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="legal-panel">
+        <h2>EPGÜ &amp; Verfahrensordnung</h2>
+        <div class="legal-cards">
+          <a href="https://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:C:2013:175:0001:0040:De:PDF" target="_blank" class="legal-card">
+            <div class="legal-card-icon">📄</div>
+            <div class="legal-card-title">EPGÜ</div>
+            <div class="legal-card-desc">Übereinkommen über ein Einheitliches Patentgericht</div>
+          </a>
+          <a href="https://www.unifiedpatentcourt.org/sites/default/files/upc_documents/agreement-on-a-unified-patent-court.pdf" target="_blank" class="legal-card">
+            <div class="legal-card-icon">📄</div>
+            <div class="legal-card-title">UPCA</div>
+            <div class="legal-card-desc">Agreement on a Unified Patent Court</div>
+          </a>
+          <a href="https://www.unifiedpatentcourt.org/sites/default/files/upc_documents/consolidated_rop_de_updated_cover_page_0.pdf" target="_blank" class="legal-card">
+            <div class="legal-card-icon">📄</div>
+            <div class="legal-card-title">Verfahrensordnung</div>
+          </a>
+          <a href="https://www.unifiedpatentcourt.org/sites/default/files/upc_documents/rop_en_25_july_2022_final_consolidated_published_on_website.pdf" target="_blank" class="legal-card">
+            <div class="legal-card-icon">📄</div>
+            <div class="legal-card-title">Rules of Procedure</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="proj-modal">
+  <div id="proj-modal-box">
+    <h3>Neues Projekt</h3>
+    <input type="text" id="proj-name-inp" placeholder="Projektname…" maxlength="40">
+    <div class="color-row">
+      <div class="col-dot sel" data-color="#111111" style="background:#111111" onclick="selColor('#111111',this)"></div>
+      <div class="col-dot" data-color="#e53e3e" style="background:#e53e3e" onclick="selColor('#e53e3e',this)"></div>
+      <div class="col-dot" data-color="#d97706" style="background:#d97706" onclick="selColor('#d97706',this)"></div>
+      <div class="col-dot" data-color="#2563eb" style="background:#2563eb" onclick="selColor('#2563eb',this)"></div>
+      <div class="col-dot" data-color="#2563eb" style="background:#2563eb" onclick="selColor('#2563eb',this)"></div>
+      <div class="col-dot" data-color="#7c3aed" style="background:#7c3aed" onclick="selColor('#7c3aed',this)"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeProjModal()">Abbrechen</button>
+      <button class="mbtn primary" onclick="saveProject()">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let allDecisions = [], filteredDecisions = [];
+let sortKey = 'date', sortDir = -1;
+let projects = [], chats = [], activeChatId = null, chatHistory = [];
+let currentProjectFilter = '', selectedColor = '#111111';
+let isStreaming = false;
+
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function init() {
+  projects = lsGet('upc_projects') || [];
+  chats    = lsGet('upc_chats') || [];
+  renderProjectSelect();
+  renderChatList();
+  if (chats.length > 0) {
+    loadChat(chats[0].id);
+  } else {
+    newChat();
+  }
+}
+
+// Projects
+function openProjModal() {
+  document.getElementById('proj-modal').classList.add('open');
+  setTimeout(() => document.getElementById('proj-name-inp').focus(), 50);
+}
+function closeProjModal() {
+  document.getElementById('proj-modal').classList.remove('open');
+  document.getElementById('proj-name-inp').value = '';
+}
+function selColor(c, el) {
+  selectedColor = c;
+  document.querySelectorAll('.col-dot').forEach(d => d.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function saveProject() {
+  const name = document.getElementById('proj-name-inp').value.trim();
+  if (!name) return;
+  projects.push({ id: 'p_' + Date.now(), name, color: selectedColor });
+  lsSet('upc_projects', projects);
+  renderProjectSelect();
+  closeProjModal();
+}
+function renderProjectSelect() {
+  const sel = document.getElementById('project-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Alle Chats</option>' +
+    projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+function filterByProject(val) {
+  currentProjectFilter = val;
+  renderChatList();
+}
+
+// Chats
+function newChat() {
+  const id = 'c_' + Date.now();
+  const projId = document.getElementById('project-select').value || null;
+  chats.unshift({ id, title: 'Neuer Chat', projectId: projId, messages: [], createdAt: Date.now() });
+  lsSet('upc_chats', chats);
+  activeChatId = id;
+  chatHistory = [];
+  document.getElementById('messages').innerHTML = '';
+  renderChatList();
+  showWelcome();
+}
+function loadChat(id) {
+  const chat = chats.find(c => c.id === id);
+  if (!chat) return;
+  activeChatId = id;
+  chatHistory = chat.messages || [];
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  chatHistory.forEach(m => appendMsg(m.role === 'user' ? 'user' : 'assistant', m.content));
+  renderChatList();
+  msgs.scrollTop = msgs.scrollHeight;
+  if (chatHistory.length === 0) showWelcome();
+}
+function saveChatTitle(text) {
+  const chat = chats.find(c => c.id === activeChatId);
+  if (!chat || chat.title !== 'Neuer Chat') return;
+  chat.title = text.slice(0, 44) + (text.length > 44 ? '…' : '');
+  lsSet('upc_chats', chats);
+  renderChatList();
+}
+function saveChatMessages() {
+  const chat = chats.find(c => c.id === activeChatId);
+  if (!chat) return;
+  chat.messages = chatHistory;
+  lsSet('upc_chats', chats);
+}
+function renderChatList() {
+  const list = document.getElementById('chat-list');
+  const visible = currentProjectFilter
+    ? chats.filter(c => c.projectId === currentProjectFilter)
+    : chats;
+  if (visible.length === 0) {
+    list.innerHTML = '<div style="padding:14px 10px;font-size:12px;color:#9ca3af;">Noch keine Chats</div>';
+    return;
+  }
+  list.innerHTML = visible.map(c => {
+    const proj = projects.find(p => p.id === c.projectId);
+    const dot = proj ? `<span class="chat-dot" style="background:${proj.color}"></span>` : '';
+    const d = new Date(c.createdAt);
+    const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    return `<div class="chat-item${c.id === activeChatId ? ' active' : ''}" onclick="loadChat('${c.id}')">
+      <div class="chat-item-title">${esc(c.title)}</div>
+      <div class="chat-item-meta">${dot}<span class="chat-date">${dateStr}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// Tabs
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active',
+      (i===0 && tab==='chat') || (i===1 && tab==='db') || (i===2 && tab==='legal'));
+  });
+  document.getElementById('chat-panel').style.display  = tab === 'chat'  ? 'flex'  : 'none';
+  document.getElementById('db-panel').style.display    = tab === 'db'    ? 'flex'  : 'none';
+  document.getElementById('legal-panel').style.display = tab === 'legal' ? 'block' : 'none';
+  if (tab === 'db' && allDecisions.length === 0) loadDecisions();
+}
+
+// Database
+async function loadDecisions() {
+  try {
+    const res = await fetch('https://web-production-7eba.up.railway.app/decisions');
+    allDecisions = await res.json();
+    allDecisions.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    filteredDecisions = [...allDecisions];
+    renderTable();
+  } catch(e) {
+    document.getElementById('table-body').innerHTML =
+      '<tr><td colspan="4" style="text-align:center;color:#999;padding:40px;">Server nicht erreichbar</td></tr>';
+    document.getElementById('db-count').textContent = '';
+  }
+}
+function filterTable(q) {
+  const s = q.toLowerCase();
+  filteredDecisions = allDecisions.filter(d =>
+    (d.ref||'').toLowerCase().includes(s) ||
+    (d.title||'').toLowerCase().includes(s) ||
+    (d.parties_structured||d.parties||'').toLowerCase().includes(s) ||
+    (d.date||'').includes(s) ||
+    (d.court||'').toLowerCase().includes(s) ||
+    (d.type||'').toLowerCase().includes(s) ||
+    (d.keywords||[]).some(k => k.toLowerCase().includes(s))
+  );
+  renderTable();
+}
+function sortTable(key) {
+  if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+  filteredDecisions.sort((a,b) =>
+    (a[key]||'').toString().localeCompare((b[key]||'').toString()) * sortDir);
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sorted');
+    const ic = th.querySelector('.sort-icon');
+    if (ic) ic.textContent = '↕';
+  });
+  const map = { date:0, court:1, type:3 };
+  if (map[key] !== undefined) {
+    const th = document.querySelectorAll('th')[map[key]];
+    th.classList.add('sorted');
+    th.querySelector('.sort-icon').textContent = sortDir === 1 ? '↑' : '↓';
+  }
+  renderTable();
+}
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  document.getElementById('db-count').textContent =
+    filteredDecisions.length + ' Entscheidung' + (filteredDecisions.length !== 1 ? 'en' : '');
+  if (filteredDecisions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:40px;">Keine Ergebnisse</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filteredDecisions.map(d => {
+    const isOrder = (d.type||'').toLowerCase().includes('order');
+    const typeLabel = '<a href="' + (d.pdf_url || d.ref || '#') + '" target="_blank" style="color:#2563eb;font-weight:600;text-decoration:underline;">PDF</a>';
+    const badgeClass = isOrder ? 'badge-order' : 'badge-decision';
+    const parties = d.parties_structured || d.parties || '';
+    let partiesHtml = '–';
+    if (parties) {
+      if (parties.includes('|')) {
+        const sides = parties.split('|').map(s => s.trim());
+        const p1 = sides[0].includes(':') ? sides[0].split(':').slice(1).join(':').trim() : sides[0];
+        const p2 = sides[1] ? (sides[1].includes(':') ? sides[1].split(':').slice(1).join(':').trim() : sides[1]) : '';
+        partiesHtml = p2
+          ? `<strong>${esc(p1)}</strong> v. <strong>${esc(p2)}</strong>`
+          : `<strong>${esc(p1)}</strong>`;
+      } else if (parties.includes(' v. ')) {
+        partiesHtml = `<strong>${esc(parties)}</strong>`;
+      } else {
+        partiesHtml = `<strong>${esc(parties.split(',')[0].trim())}</strong>`;
+      }
+    }
+    const pdfUrl = (d.ref && d.ref.startsWith('http')) ? d.ref : (d.pdf_url || '');
+    const typeHtml = pdfUrl
+      ? `<a href="${esc(pdfUrl)}" target="_blank" style="color:#2563eb;font-weight:600;text-decoration:underline;">PDF</a>`
+      : `<span style="color:#6b7280;font-size:12px;">—</span>`;
+    const courtShort = (d.court||'')
+      .replace('Court of Appeal','Berufungsgericht')
+      .replace('Local Division','Lokalkammer')
+      .replace('Central Division','Zentralkammer')
+      .replace('Regional Division','Regionalkammer');
+    return `<tr>
+      <td class="col-date">${esc(d.date||'–')}</td>
+      <td class="col-court">${esc(courtShort)}</td>
+      <td>${partiesHtml}</td>
+      <td class="col-type">${typeHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Chat
+function formatText(text) {
+  text = text.replace(/\[\[LAWLINK:([^\|]+)\|([^\]]+)\]\]/g,
+    (m, label, url) => `<a class="law-link" href="${url.trim()}" target="_blank">${label.trim()} ↗</a>`);
+  text = text.replace(/\[([^\|\]]+)\|([^\|\]]+)\|([^\|\]]+)\|([^\]]+)\]/g,
+    (m, ref, date, label, url) =>
+      `<strong><a class="decision-link" href="${url.trim()}" target="_blank">${esc(label.trim())} ↗</a></strong>`);
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/^## (.+)$/gm, '<br><strong style="font-size:15px">$1</strong>');
+  text = text.replace(/^### (.+)$/gm, '<strong>$1</strong>');
+  text = text.replace(/\n/g, '<br>');
+  return text;
+}
+function avatarHtml(role, typing=false) {
+  return role === 'assistant'
+    ? `<div class="msg-avatar${typing ? ' typing-avatar' : ''}""><svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="upcr-bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a8d4e8"/>
+      <stop offset="40%" stop-color="#4a7fa0"/>
+      <stop offset="100%" stop-color="#1a3a50"/>
+    </radialGradient>
+    <filter id="upcr-glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="upcr-lglow">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="200" cy="200" r="195" fill="url(#upcr-bg)"/>
+  <g stroke="white" stroke-width="2.2" opacity="0.7" filter="url(#upcr-lglow)">
+    <line x1="200" y1="60" x2="200" y2="340"/><line x1="270" y1="78.8" x2="130" y2="321.2"/>
+    <line x1="321.2" y1="130" x2="78.8" y2="270"/><line x1="340" y1="200" x2="60" y2="200"/>
+    <line x1="321.2" y1="270" x2="78.8" y2="130"/><line x1="270" y1="321.2" x2="130" y2="78.8"/>
+  </g>
+  <g stroke="white" stroke-width="1.8" opacity="0.45">
+    <line x1="200" y1="60" x2="321.2" y2="270"/><line x1="270" y1="78.8" x2="270" y2="321.2"/>
+    <line x1="321.2" y1="130" x2="200" y2="340"/><line x1="340" y1="200" x2="130" y2="321.2"/>
+    <line x1="321.2" y1="270" x2="78.8" y2="270"/><line x1="270" y1="321.2" x2="60" y2="200"/>
+    <line x1="200" y1="340" x2="78.8" y2="130"/><line x1="130" y1="321.2" x2="130" y2="78.8"/>
+    <line x1="78.8" y1="270" x2="200" y2="60"/><line x1="60" y1="200" x2="270" y2="78.8"/>
+    <line x1="78.8" y1="130" x2="321.2" y2="130"/><line x1="130" y1="78.8" x2="340" y2="200"/>
+  </g>
+  <g stroke="white" stroke-width="1.2" opacity="0.32">
+    <line x1="200" y1="60" x2="321.2" y2="130"/><line x1="270" y1="78.8" x2="340" y2="200"/>
+    <line x1="321.2" y1="130" x2="321.2" y2="270"/><line x1="340" y1="200" x2="270" y2="321.2"/>
+    <line x1="321.2" y1="270" x2="200" y2="340"/><line x1="270" y1="321.2" x2="130" y2="321.2"/>
+    <line x1="200" y1="340" x2="78.8" y2="270"/><line x1="130" y1="321.2" x2="60" y2="200"/>
+    <line x1="78.8" y1="270" x2="78.8" y2="130"/><line x1="60" y1="200" x2="130" y2="78.8"/>
+    <line x1="78.8" y1="130" x2="200" y2="60"/><line x1="130" y1="78.8" x2="270" y2="78.8"/>
+  </g>
+  <g stroke="white" stroke-width="0.9" opacity="0.4">
+    <line x1="200" y1="60" x2="270" y2="78.8"/><line x1="270" y1="78.8" x2="321.2" y2="130"/>
+    <line x1="321.2" y1="130" x2="340" y2="200"/><line x1="340" y1="200" x2="321.2" y2="270"/>
+    <line x1="321.2" y1="270" x2="270" y2="321.2"/><line x1="270" y1="321.2" x2="200" y2="340"/>
+    <line x1="200" y1="340" x2="130" y2="321.2"/><line x1="130" y1="321.2" x2="78.8" y2="270"/>
+    <line x1="78.8" y1="270" x2="60" y2="200"/><line x1="60" y1="200" x2="78.8" y2="130"/>
+    <line x1="78.8" y1="130" x2="130" y2="78.8"/><line x1="130" y1="78.8" x2="200" y2="60"/>
+  </g>
+  <g fill="white" filter="url(#upcr-glow)">
+    <circle cx="200" cy="60" r="11"/><circle cx="270" cy="78.8" r="11"/>
+    <circle cx="321.2" cy="130" r="11"/><circle cx="340" cy="200" r="11"/>
+    <circle cx="321.2" cy="270" r="11"/><circle cx="270" cy="321.2" r="11"/>
+    <circle cx="200" cy="340" r="11"/><circle cx="130" cy="321.2" r="11"/>
+    <circle cx="78.8" cy="270" r="11"/><circle cx="60" cy="200" r="11"/>
+    <circle cx="78.8" cy="130" r="11"/><circle cx="130" cy="78.8" r="11"/>
+  </g>
+</svg></div>`
+    : `<div class="msg-avatar">Du</div>`;
+}
+function appendMsg(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = avatarHtml(role) + `<div><div class="msg-bubble">${formatText(text)}</div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg assistant'; div.id = 'typing-ind';
+  div.innerHTML = avatarHtml('assistant', true) +
+    `<div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function removeTyping() {
+  const el = document.getElementById('typing-ind');
+  if (el) el.remove();
+}
+function showWelcome() {
+  appendMsg('assistant', 'Guten Tag. Ich bin Ihr KI-Assistent für UPC-Entscheidungen. Wie kann ich Ihnen helfen?');
+  const row = document.createElement('div');
+  row.className = 'suggestions-row';
+  const suggs = [
+    'Wie wird eine einstweilige Verfügung beurteilt?',
+    'Was bedeutet erfinderische Tätigkeit beim UPC?',
+    'Welche Maßstäbe gelten für die Aussetzung des Verfahrens?',
+    'Was entschied das Berufungsgericht zu Regel 262?'
+  ];
+  row.innerHTML = suggs.map(s =>
+    `<button class="suggestion-btn" onclick="useSugg(this.dataset.text)" data-text="${esc(s)}">${esc(s)}</button>`
+  ).join('');
+  document.getElementById('messages').appendChild(row);
+}
+function useSugg(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+let currentMode = 'normal';
+
+async function sendMessage() {
+  if (isStreaming) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = '';
+
+  appendMsg('user', text);
+  saveChatTitle(text);
+  chatHistory.push({ role: 'user', content: text });
+  saveChatMessages();
+
+  showTyping();
+  isStreaming = true;
+
+  try {
+    const res = await fetch('https://web-production-7eba.up.railway.app/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory, mode: currentMode })
+    });
+
+    removeTyping();
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    div.innerHTML = avatarHtml('assistant') +
+      `<div><div class="msg-bubble" id="stream-bubble"></div></div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    const bubble = document.getElementById('stream-bubble');
+    let fullText = '';
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          if (d.type === 'text') {
+            fullText += d.text;
+            bubble.innerHTML = formatText(fullText);
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if (d.type === 'suggestions' && d.suggestions) {
+            const suggDiv = document.createElement('div');
+            suggDiv.className = 'inline-suggestions';
+            suggDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;';
+            d.suggestions.forEach(s => {
+              const btn = document.createElement('button');
+              btn.className = 'suggestion-btn';
+              btn.textContent = s;
+              btn.onclick = () => {
+                suggDiv.remove();
+                useSugg(s);
+              };
+              suggDiv.appendChild(btn);
+            });
+            bubble.appendChild(suggDiv);
+            msgs.scrollTop = msgs.scrollHeight;
+          }
+        } catch(e) {}
+      }
+    }
+    bubble.id = '';
+    chatHistory.push({ role: 'assistant', content: fullText });
+    saveChatMessages();
+  } catch(e) {
+    removeTyping();
+    appendMsg('assistant', 'Verbindungsfehler. Bitte prüfen Sie ob der Server läuft (`python3 ~/Desktop/upc_server_neu.py`).');
+  } finally {
+    isStreaming = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
