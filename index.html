@@ -31,11 +31,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 #chat-list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 1px; }
 #chat-list::-webkit-scrollbar { width: 3px; }
 #chat-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-.chat-item { padding: 9px 10px; border-radius: 7px; cursor: pointer; transition: background 0.1s; }
+.chat-item { padding: 9px 10px; border-radius: 7px; cursor: pointer; transition: background 0.1s; position: relative; }
 .chat-item:hover { background: #eef0f5; }
+.chat-item:hover .chat-item-menu-btn { opacity: 1; }
 .chat-item.active { background: #e2e5ed; }
-.chat-item-title { font-size: 12px; font-weight: 500; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.chat-item.active .chat-item-menu-btn { opacity: 1; }
+.chat-item-title { font-size: 12px; font-weight: 500; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; padding-right: 20px; }
+.chat-item-title-input { width: 100%; font-size: 12px; font-weight: 500; color: #111; border: 1px solid #1a3a50; border-radius: 4px; padding: 2px 5px; margin-bottom: 3px; outline: none; background: #fff; font-family: inherit; }
 .chat-item-meta { display: flex; align-items: center; gap: 5px; }
+.chat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.chat-date { font-size: 10px; color: #9ca3af; }
+.chat-item-menu-btn { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border: none; background: transparent; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; opacity: 0; transition: opacity 0.1s, background 0.1s; font-size: 16px; line-height: 1; padding: 0; }
+.chat-item-menu-btn:hover { background: #d1d5db; color: #111; }
+.chat-menu-dropdown { position: absolute; top: 28px; right: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); min-width: 140px; z-index: 50; overflow: hidden; }
+.chat-menu-item { padding: 8px 12px; font-size: 12px; color: #111; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s; }
+.chat-menu-item:hover { background: #f3f4f6; }
+.chat-menu-item.danger { color: #b91c1c; }
+.chat-menu-item.danger:hover { background: #fef2f2; }
 .chat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .chat-date { font-size: 10px; color: #9ca3af; }
 
@@ -83,6 +95,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .suggestions-row { display: flex; gap: 8px; padding: 0 10% 12px; flex-wrap: wrap; background: #fff; }
 .suggestion-btn { background: #f0f5ff; border: 1px solid #c7d9f5; border-radius: 20px; padding: 7px 14px; font-size: 12px; color: #1a3a50; cursor: pointer; transition: all 0.15s; }
 .suggestion-btn:hover { border-color: #1a3a50; background: #dceeff; }
+
+.analyze-popover-wrap { position: relative; display: inline-block; }
+.analyze-popover { position: absolute; top: calc(100% + 6px); left: 0; background: #fff; border: 1px solid #c7d9f5; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); padding: 6px; min-width: 280px; max-height: 340px; overflow-y: auto; z-index: 50; }
+.analyze-popover-item { display: block; width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; border-radius: 6px; font-size: 12px; color: #1a3a50; cursor: pointer; font-family: inherit; }
+.analyze-popover-item:hover { background: #eef4ff; }
 
 #db-panel { flex: 1; display: none; flex-direction: column; overflow: hidden; background: #fff; }
 #db-toolbar { padding: 14px 24px; background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; }
@@ -297,6 +314,17 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<div id="delete-chat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:22px;width:340px;box-shadow:0 8px 30px rgba(0,0,0,0.18);">
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:10px;">Chat löschen?</h3>
+    <p id="delete-chat-text" style="font-size:13px;color:#4b5563;margin-bottom:18px;line-height:1.5;">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeDeleteModal()">Abbrechen</button>
+      <button class="mbtn primary" style="background:#b91c1c;border-color:#b91c1c;" onclick="confirmDeleteChat()">Löschen</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let allDecisions = [], filteredDecisions = [];
 let sortKey = 'date', sortDir = -1;
@@ -405,12 +433,127 @@ function renderChatList() {
     const dot = proj ? `<span class="chat-dot" style="background:${proj.color}"></span>` : '';
     const d = new Date(c.createdAt);
     const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-    return `<div class="chat-item${c.id === activeChatId ? ' active' : ''}" onclick="loadChat('${c.id}')">
+    return `<div class="chat-item${c.id === activeChatId ? ' active' : ''}" data-chat-id="${c.id}" onclick="onChatItemClick(event, '${c.id}')">
       <div class="chat-item-title">${esc(c.title)}</div>
       <div class="chat-item-meta">${dot}<span class="chat-date">${dateStr}</span></div>
+      <button class="chat-item-menu-btn" onclick="event.stopPropagation();toggleChatMenu(event,'${c.id}')" title="Optionen">⋯</button>
     </div>`;
   }).join('');
 }
+
+function onChatItemClick(e, id) {
+  if (e.target.closest('.chat-item-menu-btn, .chat-menu-dropdown, .chat-item-title-input')) return;
+  loadChat(id);
+}
+
+let openMenuChatId = null;
+
+function toggleChatMenu(e, chatId) {
+  e.stopPropagation();
+  if (openMenuChatId === chatId) {
+    closeChatMenu();
+    return;
+  }
+  closeChatMenu();
+  const item = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+  if (!item) return;
+  const dropdown = document.createElement('div');
+  dropdown.className = 'chat-menu-dropdown';
+  dropdown.innerHTML = `
+    <div class="chat-menu-item" onclick="startRenameChat(event,'${chatId}')">Umbenennen</div>
+    <div class="chat-menu-item danger" onclick="openDeleteChatModal(event,'${chatId}')">Löschen</div>
+  `;
+  item.appendChild(dropdown);
+  openMenuChatId = chatId;
+}
+
+function closeChatMenu() {
+  document.querySelectorAll('.chat-menu-dropdown').forEach(d => d.remove());
+  openMenuChatId = null;
+}
+
+function startRenameChat(e, chatId) {
+  e.stopPropagation();
+  closeChatMenu();
+  const item = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+  if (!item) return;
+  const titleEl = item.querySelector('.chat-item-title');
+  if (!titleEl) return;
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) return;
+  const currentTitle = chat.title;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'chat-item-title-input';
+  input.value = currentTitle;
+  input.maxLength = 80;
+
+  const finish = (save) => {
+    if (save) {
+      const v = input.value.trim();
+      if (v && v !== currentTitle) {
+        chat.title = v.slice(0, 80);
+        lsSet('upc_chats', chats);
+      }
+    }
+    renderChatList();
+  };
+
+  input.onkeydown = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+  };
+  input.onblur = () => finish(true);
+  input.onclick = (ev) => ev.stopPropagation();
+
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+let pendingDeleteChatId = null;
+
+function openDeleteChatModal(e, chatId) {
+  e.stopPropagation();
+  closeChatMenu();
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) return;
+  pendingDeleteChatId = chatId;
+  document.getElementById('delete-chat-text').textContent =
+    `"${chat.title}" wird endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`;
+  document.getElementById('delete-chat-modal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  pendingDeleteChatId = null;
+  document.getElementById('delete-chat-modal').style.display = 'none';
+}
+
+function confirmDeleteChat() {
+  if (!pendingDeleteChatId) return;
+  const id = pendingDeleteChatId;
+  chats = chats.filter(c => c.id !== id);
+  lsSet('upc_chats', chats);
+  closeDeleteModal();
+  if (activeChatId === id) {
+    if (chats.length > 0) {
+      loadChat(chats[0].id);
+    } else {
+      activeChatId = null;
+      chatHistory = [];
+      document.getElementById('messages').innerHTML = '';
+      showWelcome();
+    }
+  }
+  renderChatList();
+}
+
+document.addEventListener('click', (e) => {
+  if (openMenuChatId && !e.target.closest('.chat-menu-dropdown, .chat-item-menu-btn')) {
+    closeChatMenu();
+  }
+});
 
 // Tabs
 function switchTab(tab) {
@@ -684,6 +827,10 @@ async function sendMessage() {
             fullText += d.text;
             bubble.innerHTML = formatText(fullText);
             msgs.scrollTop = msgs.scrollHeight;
+          } else if (d.type === 'text_correction' && typeof d.text === 'string') {
+            fullText = d.text;
+            bubble.innerHTML = formatText(fullText);
+            msgs.scrollTop = msgs.scrollHeight;
           } else if (d.type === 'suggestions' && d.suggestions) {
             const suggDiv = document.createElement('div');
             suggDiv.className = 'inline-suggestions';
@@ -700,6 +847,9 @@ async function sendMessage() {
             });
             bubble.appendChild(suggDiv);
             msgs.scrollTop = msgs.scrollHeight;
+          } else if (d.type === 'analyze_suggestions' && Array.isArray(d.items) && d.items.length > 0) {
+            renderAnalyzeSuggestions(bubble, d.items, !!d.dropdown_only);
+            msgs.scrollTop = msgs.scrollHeight;
           }
         } catch(e) {}
       }
@@ -713,6 +863,75 @@ async function sendMessage() {
   } finally {
     isStreaming = false;
   }
+}
+
+function renderAnalyzeSuggestions(bubble, items, dropdownOnly) {
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-suggestions';
+  wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center;';
+
+  if (!dropdownOnly) {
+    const topItem = items[0];
+    const topBtn = document.createElement('button');
+    topBtn.className = 'suggestion-btn';
+    topBtn.textContent = topItem.label;
+    topBtn.onclick = () => {
+      wrap.remove();
+      useSugg(topItem.query);
+    };
+    wrap.appendChild(topBtn);
+  }
+
+  const dropdownItems = dropdownOnly ? items : items.slice(1);
+  const showDropdown = dropdownItems.length > 0;
+
+  if (showDropdown) {
+    const moreWrap = document.createElement('div');
+    moreWrap.className = 'analyze-popover-wrap';
+
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'suggestion-btn';
+    const labelPrefix = dropdownOnly ? 'Andere Entscheidung analysieren' : 'Weitere Entscheidung analysieren';
+    moreBtn.textContent = `${labelPrefix} (${dropdownItems.length})`;
+    moreWrap.appendChild(moreBtn);
+
+    let popover = null;
+    const closePopover = () => {
+      if (popover) {
+        popover.remove();
+        popover = null;
+        document.removeEventListener('click', onDocClick);
+      }
+    };
+    const onDocClick = (ev) => {
+      if (!moreWrap.contains(ev.target)) closePopover();
+    };
+
+    moreBtn.onclick = (ev) => {
+      ev.stopPropagation();
+      if (popover) { closePopover(); return; }
+      popover = document.createElement('div');
+      popover.className = 'analyze-popover';
+      dropdownItems.forEach(item => {
+        const itemBtn = document.createElement('button');
+        itemBtn.className = 'analyze-popover-item';
+        itemBtn.textContent = item.label;
+        itemBtn.onclick = (e) => {
+          e.stopPropagation();
+          closePopover();
+          wrap.remove();
+          useSugg(item.query);
+        };
+        popover.appendChild(itemBtn);
+      });
+      moreWrap.appendChild(popover);
+      setTimeout(() => document.addEventListener('click', onDocClick), 0);
+    };
+
+    wrap.appendChild(moreWrap);
+  }
+
+  bubble.appendChild(wrap);
 }
 
 init();
