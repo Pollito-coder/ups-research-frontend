@@ -96,6 +96,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .suggestion-btn { background: #f0f5ff; border: 1px solid #c7d9f5; border-radius: 20px; padding: 7px 14px; font-size: 12px; color: #1a3a50; cursor: pointer; transition: all 0.15s; }
 .suggestion-btn:hover { border-color: #1a3a50; background: #dceeff; }
 
+.mode-btn { background: #f3f4f6; border: 1px solid #e5e7eb; color: #4b5563; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+.mode-btn:hover { background: #e5e7eb; }
+.mode-btn.active { background: #1a3a50; color: #fff; border-color: #1a3a50; }
+
 .analyze-popover-wrap { position: relative; display: inline-block; }
 .analyze-popover { position: absolute; top: calc(100% + 6px); left: 0; background: #fff; border: 1px solid #c7d9f5; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); padding: 6px; min-width: 280px; max-height: 340px; overflow-y: auto; z-index: 50; }
 .analyze-popover-item { display: block; width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; border-radius: 6px; font-size: 12px; color: #1a3a50; cursor: pointer; font-family: inherit; }
@@ -238,6 +242,10 @@ tr:last-child td { border-bottom: none; }
     <div id="main">
       <div id="chat-panel">
         <div id="messages"></div>
+        <div style="display:flex;gap:8px;padding:8px 10% 0;background:#fff;">
+          <button class="mode-btn active" id="mode-btn-normal" onclick="setMode('normal')">Textsuche</button>
+          <button class="mode-btn" id="mode-btn-norm" onclick="setMode('norm')">Normsuche</button>
+        </div>
         <div id="input-area">
           <textarea id="chat-input" placeholder="Frage zu UPC-Entscheidungen stellen…" onkeydown="handleKey(event)"></textarea>
           <button id="send-btn" onclick="sendMessage()">
@@ -774,6 +782,16 @@ function handleKey(e) {
 }
 let currentMode = 'normal';
 
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('mode-btn-normal').classList.toggle('active', m === 'normal');
+  document.getElementById('mode-btn-norm').classList.toggle('active', m === 'norm');
+  const input = document.getElementById('chat-input');
+  input.placeholder = m === 'norm'
+    ? 'z.B. R. 190 VerfO oder Art. 59 EPGÜ'
+    : 'z.B. Was sagt der UPC zu erfinderischer Tätigkeit?';
+}
+
 async function sendMessage() {
   if (isStreaming) return;
   const input = document.getElementById('chat-input');
@@ -790,11 +808,15 @@ async function sendMessage() {
   showTyping();
   isStreaming = true;
 
+  // Norm-Modus gilt nur fuer die erste Frage — danach zurueck auf Allgemein
+  const submittedMode = currentMode;
+  if (currentMode === 'norm') setMode('normal');
+
   try {
     const res = await fetch('https://web-production-7eba.up.railway.app/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chatHistory, mode: currentMode })
+      body: JSON.stringify({ messages: chatHistory, mode: submittedMode })
     });
 
     removeTyping();
