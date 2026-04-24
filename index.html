@@ -782,6 +782,10 @@ function handleKey(e) {
 }
 let currentMode = 'normal';
 
+// Load-More-State fuer Normsuche: Keys der bereits behandelten Entscheidungen.
+let normExcludeKeys = [];
+let normCurrentNorm = null;
+
 function setMode(m) {
   currentMode = m;
   document.getElementById('mode-btn-normal').classList.toggle('active', m === 'normal');
@@ -800,23 +804,49 @@ async function sendMessage() {
   input.value = '';
   input.style.height = '';
 
+  // Neue User-Eingabe: Load-More-State zuruecksetzen
+  if (currentMode === 'norm') {
+    normExcludeKeys = [];
+    normCurrentNorm = null;
+  }
+
   appendMsg('user', text);
   saveChatTitle(text);
   chatHistory.push({ role: 'user', content: text });
   saveChatMessages();
 
-  showTyping();
-  isStreaming = true;
-
   // Norm-Modus gilt nur fuer die erste Frage — danach zurueck auf Allgemein
   const submittedMode = currentMode;
   if (currentMode === 'norm') setMode('normal');
 
+  await performChatRequest({ mode: submittedMode, excludeRefs: null });
+}
+
+async function sendLoadMore() {
+  if (isStreaming) return;
+  const normLabel = normCurrentNorm || 'dieser Norm';
+  const syntheticUserMsg = `Weitere Entscheidungen zu ${normLabel} laden`;
+  appendMsg('user', syntheticUserMsg);
+  chatHistory.push({ role: 'user', content: syntheticUserMsg });
+  saveChatMessages();
+
+  await performChatRequest({ mode: 'norm', excludeRefs: normExcludeKeys.slice() });
+}
+
+async function performChatRequest({ mode, excludeRefs }) {
+  showTyping();
+  isStreaming = true;
+
   try {
+    const body = { messages: chatHistory, mode };
+    if (excludeRefs && excludeRefs.length > 0) {
+      body.exclude_refs = excludeRefs;
+    }
+
     const res = await fetch('https://web-production-7eba.up.railway.app/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chatHistory, mode: submittedMode })
+      body: JSON.stringify(body)
     });
 
     removeTyping();
@@ -872,6 +902,33 @@ async function sendMessage() {
           } else if (d.type === 'analyze_suggestions' && Array.isArray(d.items) && d.items.length > 0) {
             renderAnalyzeSuggestions(bubble, d.items, !!d.dropdown_only);
             msgs.scrollTop = msgs.scrollHeight;
+          } else if (d.type === 'norm_meta') {
+            if (d.norm) normCurrentNorm = d.norm;
+            if (Array.isArray(d.current_keys)) {
+              d.current_keys.forEach(k => {
+                if (k && normExcludeKeys.indexOf(k) === -1) {
+                  normExcludeKeys.push(k);
+                }
+              });
+            }
+            if (d.has_more) {
+              const loadMoreDiv = document.createElement('div');
+              loadMoreDiv.className = 'inline-suggestions';
+              loadMoreDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;';
+              const btn = document.createElement('button');
+              btn.className = 'suggestion-btn';
+              const countLabel = d.remaining_count
+                ? `Weitere ${Math.min(d.remaining_count, 10)} Entscheidungen laden`
+                : 'Weitere Entscheidungen laden';
+              btn.textContent = countLabel;
+              btn.onclick = () => {
+                loadMoreDiv.remove();
+                sendLoadMore();
+              };
+              loadMoreDiv.appendChild(btn);
+              bubble.appendChild(loadMoreDiv);
+              msgs.scrollTop = msgs.scrollHeight;
+            }
           }
         } catch(e) {}
       }
