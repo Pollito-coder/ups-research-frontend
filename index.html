@@ -954,7 +954,7 @@ function showWelcome() {
   const suggs = [
     'Was sagt der UPC zur erfinderischen Tätigkeit?',
     'Hat die Lokalkammer Brüssel zu R. 190 VerfO entschieden?',
-    'Welches Rechtsmittel ist gegen eine Anordnung nach Art. 59 EPGÜ zulässig?'
+    'Welches Rechtsmittel ist gegen eine Anordnung nach Art. 59 EPGÜ, R. 190 VerfO zulässig?'
   ];
   row.innerHTML = suggs.map(s =>
     `<button class="suggestion-btn" onclick="useSugg(this.dataset.text)" data-text="${esc(s)}">${esc(s)}</button>`
