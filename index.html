@@ -355,7 +355,15 @@ tr:last-child td { border-bottom: none; }
       </div>
 
       <div id="db-panel">
-        <div id="db-toolbar">
+        <div id="db-toolbar" style="display:flex; align-items:center; gap:8px;">
+          <input class="db-filter" id="filter-fulltext"
+                 placeholder="Volltextsuche…"
+                 style="flex:1; max-width:340px; background:#fff;"
+                 onkeydown="if(event.key==='Enter') runFulltextSearch()">
+          <button onclick="runFulltextSearch()" style="padding:6px 14px; background:#1a3a50; color:#fff; border:none; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit;">Suchen</button>
+          <button id="fulltext-clear" onclick="clearFulltextSearch()" style="display:none; padding:6px 10px; background:#f3f4f6; border:1px solid #d1d5db; border-radius:6px; font-size:12px; cursor:pointer; color:#4b5563; font-family:inherit;">×</button>
+          <span id="fulltext-status" style="font-size:11px; color:#6b7280;"></span>
+          <span style="flex:1;"></span>
           <span id="db-count">Lade…</span>
         </div>
         <div id="db-filters">
@@ -763,6 +771,42 @@ function filterTable(q) {
   renderTable();
 }
 
+// Wenn eine Volltextsuche aktiv ist, halten wir hier die erlaubten decision_ids
+let fulltextFilterIds = null;  // null = inaktiv, Set<int> = aktiv
+
+async function runFulltextSearch() {
+  const input = document.getElementById('filter-fulltext');
+  const status = document.getElementById('fulltext-status');
+  const clearBtn = document.getElementById('fulltext-clear');
+  const q = (input.value || '').trim();
+  if (!q || q.length < 2) {
+    status.textContent = 'Bitte mindestens 2 Zeichen eingeben';
+    return;
+  }
+  status.textContent = 'Suche läuft…';
+  clearBtn.style.display = 'none';
+  try {
+    const url = 'https://web-production-7eba.up.railway.app' + '/decisions/search?q=' + encodeURIComponent(q);
+    const res = await fetch(url);
+    const data = await res.json();
+    fulltextFilterIds = new Set(data.decision_ids || []);
+    status.textContent = data.count + ' Treffer für "' + q + '"';
+    clearBtn.style.display = '';
+    applyFilters();
+  } catch(e) {
+    status.textContent = 'Fehler bei der Suche';
+    fulltextFilterIds = null;
+  }
+}
+
+function clearFulltextSearch() {
+  document.getElementById('filter-fulltext').value = '';
+  document.getElementById('fulltext-status').textContent = '';
+  document.getElementById('fulltext-clear').style.display = 'none';
+  fulltextFilterIds = null;
+  applyFilters();
+}
+
 function applyFilters() {
   const fDate    = (document.getElementById('filter-date').value||'').trim().toLowerCase();
   const fCourt   = (document.getElementById('filter-court').value||'').trim();
@@ -771,6 +815,7 @@ function applyFilters() {
   const fNorms   = (document.getElementById('filter-norms').value||'').trim().toLowerCase();
 
   filteredDecisions = allDecisions.filter(d => {
+    if (fulltextFilterIds !== null && !fulltextFilterIds.has(d.id)) return false;
     if (fDate    && !(d.date||'').includes(fDate)) return false;
     if (fCourt   && !(d.court||'').includes(fCourt)) return false;
     if (fParties && !(d.parties_structured||'').toLowerCase().includes(fParties)) return false;
@@ -1123,6 +1168,9 @@ async function performChatRequest({ mode, excludeRefs }) {
           } else if (d.type === 'analyze_suggestions' && Array.isArray(d.items) && d.items.length > 0) {
             renderAnalyzeSuggestions(bubble, d.items, !!d.dropdown_only);
             msgs.scrollTop = msgs.scrollHeight;
+          } else if (d.type === 'version_picker' && Array.isArray(d.items) && d.items.length > 0) {
+            renderVersionPicker(bubble, d.items);
+            msgs.scrollTop = msgs.scrollHeight;
           } else if (d.type === 'norm_meta') {
             if (d.norm) normCurrentNorm = d.norm;
             if (Array.isArray(d.current_keys)) {
@@ -1176,6 +1224,23 @@ async function performChatRequest({ mode, excludeRefs }) {
     setStreamingUI(false);
     activeAbortController = null;
   }
+}
+
+function renderVersionPicker(bubble, items) {
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-suggestions';
+  wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center;';
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'suggestion-btn';
+    btn.textContent = item.label;
+    btn.onclick = () => {
+      wrap.remove();
+      useSugg(item.query);
+    };
+    wrap.appendChild(btn);
+  });
+  bubble.appendChild(wrap);
 }
 
 function renderAnalyzeSuggestions(bubble, items, dropdownOnly) {
