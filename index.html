@@ -343,9 +343,12 @@ tr:last-child td { border-bottom: none; }
         </div>
         <div id="input-area">
           <textarea id="chat-input" placeholder="z.B. Was sagt der UPC zu erfinderischer Tätigkeit?" onkeydown="handleKey(event)"></textarea>
-          <button id="send-btn" onclick="sendMessage()">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <button id="send-btn" onclick="onSendOrStop()">
+            <svg id="send-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M2 8L14 8M14 8L9 3M14 8L9 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg id="stop-icon" width="14" height="14" viewBox="0 0 14 14" style="display:none;">
+              <rect x="2" y="2" width="10" height="10" rx="1.5" fill="currentColor"/>
             </svg>
           </button>
         </div>
@@ -466,6 +469,32 @@ let sortKey = 'date', sortDir = -1;
 let projects = [], chats = [], activeChatId = null, chatHistory = [];
 let currentProjectFilter = '', selectedColor = '#111111';
 let isStreaming = false;
+let activeAbortController = null;
+
+function setStreamingUI(streaming) {
+  isStreaming = streaming;
+  const sendIcon = document.getElementById('send-icon');
+  const stopIcon = document.getElementById('stop-icon');
+  if (sendIcon && stopIcon) {
+    sendIcon.style.display = streaming ? 'none' : '';
+    stopIcon.style.display = streaming ? '' : 'none';
+  }
+}
+
+function onSendOrStop() {
+  if (isStreaming) {
+    stopStreaming();
+  } else {
+    sendMessage();
+  }
+}
+
+function stopStreaming() {
+  if (activeAbortController) {
+    try { activeAbortController.abort(); } catch(e) {}
+    activeAbortController = null;
+  }
+}
 
 function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
@@ -1023,7 +1052,10 @@ async function sendLoadMore() {
 
 async function performChatRequest({ mode, excludeRefs }) {
   showTyping();
-  isStreaming = true;
+  setStreamingUI(true);
+
+  // AbortController fuer Stop-Funktionalitaet
+  activeAbortController = new AbortController();
 
   try {
     const body = { messages: chatHistory, mode };
@@ -1034,7 +1066,8 @@ async function performChatRequest({ mode, excludeRefs }) {
     const res = await fetch('https://web-production-7eba.up.railway.app/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: activeAbortController.signal
     });
 
     removeTyping();
@@ -1125,10 +1158,23 @@ async function performChatRequest({ mode, excludeRefs }) {
     chatHistory.push({ role: 'assistant', content: fullText });
     saveChatMessages();
   } catch(e) {
-    removeTyping();
-    appendMsg('assistant', 'Verbindungsfehler. Bitte prüfen Sie ob der Server läuft (`python3 ~/Desktop/upc_server_neu.py`).');
+    if (e && e.name === 'AbortError') {
+      // Nutzer hat gestoppt — bisherige Antwort behalten, Hinweis anhaengen
+      removeTyping();
+      if (fullText) {
+        fullText += '\n\n_(Antwort vom Nutzer gestoppt)_';
+        if (bubble) bubble.innerHTML = formatText(fullText);
+        bubble && (bubble.id = '');
+        chatHistory.push({ role: 'assistant', content: fullText });
+        saveChatMessages();
+      }
+    } else {
+      removeTyping();
+      appendMsg('assistant', 'Verbindungsfehler zum Server. Bitte versuchen Sie es in einem Moment erneut. Falls das Problem bestehen bleibt, kontaktieren Sie den Betreiber.');
+    }
   } finally {
-    isStreaming = false;
+    setStreamingUI(false);
+    activeAbortController = null;
   }
 }
 
