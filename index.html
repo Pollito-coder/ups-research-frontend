@@ -699,6 +699,8 @@ function switchTab(tab) {
   document.getElementById('chat-panel').style.display  = tab === 'chat'  ? 'flex'  : 'none';
   document.getElementById('db-panel').style.display    = tab === 'db'    ? 'flex'  : 'none';
   document.getElementById('legal-panel').style.display = tab === 'legal' ? 'block' : 'none';
+  // Sidebar (Chat-Liste, Projekte, Neuer-Chat-Button) nur im Chat-Modus zeigen.
+  document.getElementById('sidebar').style.display = tab === 'chat' ? 'flex' : 'none';
   if (tab === 'db' && allDecisions.length === 0) loadDecisions();
 }
 
@@ -950,7 +952,7 @@ function showWelcome() {
   const row = document.createElement('div');
   row.className = 'suggestions-row';
   const suggs = [
-    'Was sagt der UPC zu erfinderischer Tätigkeit?',
+    'Was sagt der UPC zur erfinderischen Tätigkeit?',
     'Hat die Lokalkammer Brüssel zu R. 190 VerfO entschieden?',
     'Welches Rechtsmittel ist gegen eine Anordnung nach Art. 59 EPGÜ zulässig?'
   ];
